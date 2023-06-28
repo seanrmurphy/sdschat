@@ -31,10 +31,6 @@ mkdir -p $LOGDIR
 cd $LOGDIR
 
 echo
-echo "Installing pip dependencies..."
-pip install chromadb openai langchain
-
-echo
 echo "Running controller..."
 python3 -m fastchat.serve.controller &> /dev/null &
 
@@ -46,12 +42,12 @@ python3 -m fastchat.serve.controller &> /dev/null &
 sleep 5
 echo
 echo "Running model server..."
-python3 -m fastchat.serve.model_worker --model-names "gpt-3.5-turbo,text-davinci-003,text-embedding-ada-002,vicuna-7b-v1.3" --model-path $MODEL &> /dev/null &
-
-sleep 5
+#python3 -m fastchat.serve.model_worker --model-names "gpt-3.5-turbo,text-davinci-003,text-embedding-ada-002,vicuna-7b-v1.3" --model-path $MODEL &> /dev/null &
+python3 -m fastchat.serve.model_worker --model-names "gpt-3.5-turbo,text-davinci-003,text-embedding-ada-002,vicuna-7b-v1.3" --model-path lmsys/fastchat-t5-3b-v1.0 # 31.40 - lmsys/fastchat-t5-3b-v1.0
+#sleep 5 
 echo
 echo "Running OpenAI API server on port 8000..."
-python3 -m fastchat.serve.openai_api_server --host localhost --port 8000 &> /dev/null &
+#python3 -m fastchat.serve.openai_api_server --host localhost --port 8000 &> /dev/null & 
 
 # The gradio server needs to be started after the model_worker has registered with
 # the controller; the gradio server asks the controller which models it knows about;
@@ -60,9 +56,11 @@ python3 -m fastchat.serve.openai_api_server --host localhost --port 8000 &> /dev
 # To test if a model has been registered and is usable, this command can be used:
 #   python3 -m fastchat.serve.test_message --model-name vicuna-7b-v1.3
 
-sleep 30
+#sleep 30
 echo
 echo "Running Gradio web app server for chat (port 7860 by default) ..."
-python3 -m fastchat.serve.gradio_web_server &> /dev/null &
+bash
+#python3 -m fastchat.serve.gradio_web_server 
 
-echo "All services started; see log output in $LOGDIR"
+#echo "All services started; see log output in $LOGDIR"
+
