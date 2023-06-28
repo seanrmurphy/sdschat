@@ -23,8 +23,10 @@
 # The 13b snoozy model did work for me once (first time I tried it) but I have not been
 # able to run it subsequently - it seems to have issues loading the weights into the
 # GPU.
-MODEL="lmsys/vicuna-7b-v1.3"
-# MODEL="nomic-ai/gpt4all-13b-snoozy"
+
+#MODEL="lmsys/vicuna-7b-v1.3"
+MODEL="nomic-ai/gpt4all-13b-snoozy"
+MODELNAME="$(cut -d'/' -f2 <<< $MODEL)"
 export LOGDIR="/tmp/fastchat"
 
 mkdir -p $LOGDIR
@@ -32,7 +34,14 @@ cd $LOGDIR
 
 echo
 echo "Running controller..."
-python3 -m fastchat.serve.controller &> /dev/null &
+python3 -m fastchat.serve.controller --host 0.0.0.0 >> controller.txt 2>&1 &
+#tmux new-session -d -s controller 'python3 -m fastchat.serve.controller --host 0.0.0.0'
+
+sleep 5 
+echo
+echo "Running OpenAI API server on port 8000..."
+python3 -m fastchat.serve.openai_api_server --host 0.0.0.0 --port 8000 >> openai_api_server.txt 2>&1 &
+#tmux new-session -d -s openai_api_server 'python3 -m fastchat.serve.openai_api_server --host 0.0.0.0 --port 8000'
 
 # The model names specified below have two purposes:
 # - to identify themselves when they receive API calls
@@ -41,13 +50,9 @@ python3 -m fastchat.serve.controller &> /dev/null &
 # models via the gradio web app
 sleep 5
 echo
-echo "Running model server..."
-#python3 -m fastchat.serve.model_worker --model-names "gpt-3.5-turbo,text-davinci-003,text-embedding-ada-002,vicuna-7b-v1.3" --model-path $MODEL &> /dev/null &
-python3 -m fastchat.serve.model_worker --model-names "gpt-3.5-turbo,text-davinci-003,text-embedding-ada-002,vicuna-7b-v1.3" --model-path lmsys/fastchat-t5-3b-v1.0 # 31.40 - lmsys/fastchat-t5-3b-v1.0
-#sleep 5 
-echo
-echo "Running OpenAI API server on port 8000..."
-#python3 -m fastchat.serve.openai_api_server --host localhost --port 8000 &> /dev/null & 
+echo "Running model server for $MODEL..."
+python3 -m fastchat.serve.model_worker --model-names "gpt-3.5-turbo,text-davinci-003,text-embedding-ada-002,$MODELNAME" --model-path $MODEL --host 0.0.0.0 >> model_worker.txt 2>&1 &
+
 
 # The gradio server needs to be started after the model_worker has registered with
 # the controller; the gradio server asks the controller which models it knows about;
@@ -56,11 +61,20 @@ echo "Running OpenAI API server on port 8000..."
 # To test if a model has been registered and is usable, this command can be used:
 #   python3 -m fastchat.serve.test_message --model-name vicuna-7b-v1.3
 
-#sleep 30
-echo
-echo "Running Gradio web app server for chat (port 7860 by default) ..."
+over=False
+while [ $over = False ]
+do
+  echo "Checking model worker..."
+  if cat model_worker.txt | grep Uvicorn ; then
+   echo "Model worker detected."
+   over=True
+   echo "Running Gradio web app server for chat (port 7860 by default) ..."
+   #tmux new-session -d -s gradio 'python3 -m fastchat.serve.gradio_web_server'
+   python3 -m fastchat.serve.gradio_web_server >> gradio_web_server.txt 2>&1 &
+  fi
+  echo $(tail -2 model_worker.txt)
+  sleep 5
+done
+
+echo "All services started; see log output in $LOGDIR"
 bash
-#python3 -m fastchat.serve.gradio_web_server 
-
-#echo "All services started; see log output in $LOGDIR"
-

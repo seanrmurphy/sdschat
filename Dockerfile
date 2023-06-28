@@ -12,7 +12,8 @@ RUN apt-get update && apt-get install -y \
     vim \
     git \
     htop \
-    nano
+    nano \
+    tmux
 
 RUN ln -s /usr/bin/python3 /usr/bin/python
 
