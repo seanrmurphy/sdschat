@@ -31,7 +31,7 @@
 
 # Models should be declared in env variable
 #MODELNAME="$(cut -d'/' -f2 <<< $MODEL)"
-export LOGDIR="/home/sdsc/fastchat"
+export LOGDIR="/tmp/fastchat" #"/home/sdsc/fastchat"
 
 mkdir -p $LOGDIR
 cd $LOGDIR
@@ -77,20 +77,32 @@ if ! [[ -z "${OPENAIMODEL}" ]]; then
 fi
 
 echo "$totalModels detected. Waiting for downloading..."
-loadedModels=0
-while ! [ $loadedModels = $totalModels ]
+modelsLoaded=()
+allModelsLoaded=False
+while [ $allModelsLoaded = False ]
 do
     for MODEL in "${MODELS_ARRAY[@]}"
     do
         echo "Checking $MODEL model worker..."
         MODELNAME="$(cut -d'/' -f2 <<< $MODEL)"
         if cat ${MODELNAME}_worker.txt | grep Uvicorn ; then
+            echo ""
             echo "$MODEL model worker detected."
-            loadedModels=$((loadedModels + 1))
+            #loadedModels=$((loadedModels + 1))
+            modelsLoaded+=("$MODEL")
         fi
-
-        echo $(tail -2 ${MODELNAME}_worker.txt)
+        echo $(tail -2 ${MODELNAME}_worker.txt | head -1)
+        echo ""
         sleep 2
+
+        allModelsLoaded=True
+        for item in "${MODELS_ARRAY[@]}"; do
+            echo MODELS LOADED
+            echo $modelsLoaded
+            if [[ ! " ${modelsLoaded[@]} " =~ " $item " ]]; then
+                allModelsLoaded=False
+            fi
+        done
     done
 done
 
