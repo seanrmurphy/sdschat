@@ -47,7 +47,7 @@ python3 -m fastchat.serve.openai_api_server --host 0.0.0.0 --port 8000 >> openai
 
 # Loging Huggingface 
 
-if [[ -z "${HFTOKEN+x}" ]]; then
+if ! [[ -z "${HFTOKEN+x}" ]]; then
     huggingface-cli login --token $HFTOKEN
 fi
 
