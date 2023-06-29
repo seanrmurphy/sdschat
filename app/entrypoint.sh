@@ -45,6 +45,12 @@ echo
 echo "Running OpenAI API server on port 8000..."
 python3 -m fastchat.serve.openai_api_server --host 0.0.0.0 --port 8000 >> openai_api_server.txt 2>&1 &
 
+# Loging Huggingface 
+
+if [[ -z "${HFTOKEN+x}" ]]; then
+    huggingface-cli login --token $HFTOKEN
+fi
+
 # The model names specified below have two purposes:
 # - to identify themselves when they receive API calls
 # - to register with the controller with these names
@@ -54,6 +60,8 @@ sleep 5
 echo
 echo "Running model server for $MODEL..."
 
+PORT=20002
+
 IFS=',' read -ra MODELS_ARRAY <<< "$MODELS"
 totalModels=0
 #Print the split string
@@ -61,25 +69,29 @@ for MODEL in "${MODELS_ARRAY[@]}"
 do
     echo "Running model server for $MODEL..."
     MODELNAME="$(cut -d'/' -f2 <<< $MODEL)"
-    python3 -m fastchat.serve.model_worker --model-names "$MODELNAME" --model-path $MODEL --host 0.0.0.0 >> ${MODELNAME}_worker.txt 2>&1 &
-
+    python3 -m fastchat.serve.model_worker --model-names "$MODELNAME" --model-path $MODEL --controller http://0.0.0.0:21001 --worker http://0.0.0.0:$PORT --host 0.0.0.0 --port $PORT >> ${MODELNAME}_worker.txt 2>&1 &
+    PORT=$((PORT+1))
     totalModels=$((totalModels + 1))
     sleep 1
 done
 
 # Checking if a model for openai interface is requested
-if ! [[ -z "${OPENAIMODEL}" ]]; then
+if ! [[ -z "${OPENAIMODEL+x}" ]]; then
     echo "$OPENAIMODEL openai model detected."
     MODELNAME="$(cut -d'/' -f2 <<< $OPENAIMODEL)"
-    python3 -m fastchat.serve.model_worker --model-names "gpt-3.5-turbo,text-davinci-003,text-embedding-ada-002,$MODELNAME" --model-path $OPENAIMODEL --host 0.0.0.0 >> ${MODELNAME}_worker.txt 2>&1 &   
+    python3 -m fastchat.serve.model_worker --model-names "gpt-3.5-turbo,text-davinci-003,text-embedding-ada-002,$MODELNAME" --model-path $OPENAIMODEL --controller http://0.0.0.0:21001 --worker http://0.0.0.0:$PORT --host 0.0.0.0 --port $PORT >> ${MODELNAME}_worker.txt 2>&1 &   
     totalModels=$((totalModels + 1))
+
+    MODELS_ARRAY+=("$OPENAIMODEL")
     sleep 1
 fi
+
+
 
 echo "$totalModels detected. Waiting for downloading..."
 modelsLoaded=()
 allModelsLoaded=False
-while [ $allModelsLoaded = False ]
+while [ $allModelsLoaded = False ] ## This method does not include openai model
 do
     for MODEL in "${MODELS_ARRAY[@]}"
     do
@@ -97,8 +109,8 @@ do
 
         allModelsLoaded=True
         for item in "${MODELS_ARRAY[@]}"; do
-            echo MODELS LOADED
-            echo $modelsLoaded
+            #echo MODELS LOADED
+            #echo $modelsLoaded
             if [[ ! " ${modelsLoaded[@]} " =~ " $item " ]]; then
                 allModelsLoaded=False
             fi
