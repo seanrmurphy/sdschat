@@ -22,8 +22,10 @@ docker push caviri/sdschat:latest
 docker run -it --rm -p 7860:7860 -p 8000:8000 --gpus all caviri/sdschat:latest 
 ```
 
-
+Add as many huggingface models as you want to use in `MODELS`. Separate each model by a comma. 
 
 ```
 docker run -it --rm -p 7860:7860 -p 8000:8000 -e MODELS="lmsys/fastchat-t5-3b-v1.0,lmsys/vicuna-7b-v1.3" --gpus all caviri/sdschat:root 
 ```
+
+If you want to use the OPENAI API. Use the variable: `-e OPENAIMODEL="nomic-ai/gpt4all-13b-snoozy"` 
