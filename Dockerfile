@@ -17,24 +17,25 @@ RUN apt-get update && apt-get install -y \
 
 RUN ln -s /usr/bin/python3 /usr/bin/python
 
-COPY ./requirements.txt /
-RUN pip install -r requirements.txt 
 
 RUN useradd -ms /bin/bash sdsc
 USER sdsc
 WORKDIR /home/sdsc
 
-ARG UID=10001
-RUN adduser \
-    --disabled-password \
-    --gecos "" \
-    --home "/home/sdsc" \
-    --shell "/bin/bash" \
-    --uid "${UID}" \
-    sdsc
+#ARG UID=10001
+#RUN adduser \
+#    --disabled-password \
+#    --gecos "" \
+#    --home "/home/sdsc" \
+#    --shell "/bin/bash" \
+#    --uid "${UID}" \
+#    sdsc
+#
+#USER sdsc
+#WORKDIR /home/sdsc
 
-USER sdsc
-WORKDIR /home/sdsc
+COPY ./requirements.txt /home/sdsc
+RUN pip install -r requirements.txt 
 
 COPY ./openai_api_server.py /home/sdsc/.local/lib/python3.10/site-packages/fastchat/serve
 
@@ -46,6 +47,6 @@ RUN chmod 777 /home/sdsc/app/entrypoint.sh
 USER sdsc
 
 # start jupyter lab
-CMD ["bash","/app/entrypoint.sh"]
+CMD ["bash","/home/sdsc/app/entrypoint.sh"]
 EXPOSE 8000
 EXPOSE 7860

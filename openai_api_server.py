@@ -78,7 +78,15 @@ class AppSettings(BaseSettings):
 
 app_settings = AppSettings()
 
-app = fastapi.FastAPI()
+root_path = ''
+logger.info('Checking if root path exists...')
+try:
+    root_path = os.environ['FASTCHAT_ROOT_PATH_PREFIX']
+    logger.info(f'Root path defined - running server off {root_path}') 
+except KeyError:
+    logger.info("No root path defined - using /")
+
+app = fastapi.FastAPI(root_path=root_path)
 headers = {"User-Agent": "FastChat API Server"}
 get_bearer_token = HTTPBearer(auto_error=False)
 

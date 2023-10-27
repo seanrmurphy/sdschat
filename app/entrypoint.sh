@@ -39,10 +39,9 @@ API_KEY_VAR=${API_KEY:="default-api-key"}
 URL_PREFIX_VAR=${URL_PREFIX:=""}
 
 #
-cp $HOME/.local/lib/
+# cp $HOME/.local/lib/
 
 # Models should be declared in env variable
-#MODELNAME="$(cut -d'/' -f2 <<< $MODEL)"
 export LOGDIR="/tmp/fastchat" #"/home/sdsc/fastchat"
 
 mkdir -p $LOGDIR
@@ -70,7 +69,7 @@ fi
 # models via the gradio web app
 sleep 5
 echo
-echo "Running model server for $MODEL..."
+echo "Running model server for $MODELS..."
 
 PORT=20002
 
