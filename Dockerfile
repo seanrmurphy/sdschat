@@ -33,19 +33,9 @@ RUN ln -s /usr/bin/python3 /usr/bin/python
 # USER sdsc
 # WORKDIR /home/sdsc
 
-# Torch dependencies
-RUN pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu117
-
 # Transformers
-RUN pip install transformers \ 
-    fschat \ 
-    openai \
-    accelerate \
-    ftfy \
-    diffusers \ 
-    chromadb \
-    langchain \
-    nvitop
+COPY ./requirements.txt /
+RUN pip install -r requirements.txt 
 
 #COPY ./app /home/sdsc/app
 COPY ./app /app

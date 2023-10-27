@@ -9,7 +9,7 @@
 # This file runs the services necessary to provide:
 # - an OpenAI compatible API server which connects to a model server to handle queries
 # - a Gradio web app which provides a chat interface which we can experiment with
-# 
+#
 # To use the OpenAI API, it is usually necessary to specify a key; this API server
 # does not require a key and usually the key is specified and set to 'EMPTY'.
 
@@ -29,6 +29,18 @@
 #MODEL="lmsys/fastchat-t5-3b-v1.0"
 #MODEL="tiiuae/falcon-40b"
 
+# use this model as a default if none is specified - if models
+# are specified, they
+MODELS_VAR=${MODELS:="lmsys/vicuna-13b-v1.5-16k"}
+# we always have an API key...
+API_KEY_VAR=${API_KEY:="default-api-key"}
+# when running on run ai, it can be necessary to add a URL prefix in front of the
+# endpoints
+URL_PREFIX_VAR=${URL_PREFIX:=""}
+
+#
+cp $HOME/.local/lib/
+
 # Models should be declared in env variable
 #MODELNAME="$(cut -d'/' -f2 <<< $MODEL)"
 export LOGDIR="/tmp/fastchat" #"/home/sdsc/fastchat"
@@ -38,17 +50,17 @@ cd $LOGDIR
 
 echo
 echo "Running controller..."
-python3 -m fastchat.serve.controller --host 0.0.0.0 >> controller.txt 2>&1 &
+python3 -m fastchat.serve.controller --host 0.0.0.0 >>controller.txt 2>&1 &
 
-sleep 5 
+sleep 5
 echo
 echo "Running OpenAI API server on port 8000..."
-python3 -m fastchat.serve.openai_api_server --host 0.0.0.0 --port 8000 >> openai_api_server.txt 2>&1 &
+python3 -m fastchat.serve.openai_api_server --host 0.0.0.0 --port 8000 --api-key "$API_KEY_VAR" >>openai_api_server.txt 2>&1 &
 
-# Loging Huggingface 
+# Loging Huggingface
 
 if ! [[ -z "${HFTOKEN+x}" ]]; then
-    huggingface-cli login --token $HFTOKEN
+	huggingface-cli login --token $HFTOKEN
 fi
 
 # The model names specified below have two purposes:
@@ -62,62 +74,56 @@ echo "Running model server for $MODEL..."
 
 PORT=20002
 
-IFS=',' read -ra MODELS_ARRAY <<< "$MODELS"
+IFS=',' read -ra MODELS_ARRAY <<<"$MODELS_VAR"
 totalModels=0
 #Print the split string
-for MODEL in "${MODELS_ARRAY[@]}"
-do
-    echo "Running model server for $MODEL..."
-    MODELNAME="$(cut -d'/' -f2 <<< $MODEL)"
-    python3 -m fastchat.serve.model_worker --model-names "$MODELNAME" --model-path $MODEL --controller http://0.0.0.0:21001 --worker http://0.0.0.0:$PORT --host 0.0.0.0 --port $PORT >> ${MODELNAME}_worker.txt 2>&1 &
-    PORT=$((PORT+1))
-    totalModels=$((totalModels + 1))
-    sleep 1
+for MODEL in "${MODELS_ARRAY[@]}"; do
+	echo "Running model server for $MODEL..."
+	MODELNAME="$(cut -d'/' -f2 <<<$MODEL)"
+	python3 -m fastchat.serve.model_worker --model-names "$MODELNAME" --model-path $MODEL --controller http://0.0.0.0:21001 --worker http://0.0.0.0:$PORT --host 0.0.0.0 --port $PORT >>${MODELNAME}_worker.txt 2>&1 &
+	PORT=$((PORT + 1))
+	totalModels=$((totalModels + 1))
+	sleep 1
 done
 
 # Checking if a model for openai interface is requested
 if ! [[ -z "${OPENAIMODEL+x}" ]]; then
-    echo "$OPENAIMODEL openai model detected."
-    MODELNAME="$(cut -d'/' -f2 <<< $OPENAIMODEL)"
-    python3 -m fastchat.serve.model_worker --model-names "gpt-3.5-turbo,text-davinci-003,text-embedding-ada-002,$MODELNAME" --model-path $OPENAIMODEL --controller http://0.0.0.0:21001 --worker http://0.0.0.0:$PORT --host 0.0.0.0 --port $PORT >> ${MODELNAME}_worker.txt 2>&1 &   
-    totalModels=$((totalModels + 1))
+	echo "$OPENAIMODEL openai model detected."
+	MODELNAME="$(cut -d'/' -f2 <<<$OPENAIMODEL)"
+	python3 -m fastchat.serve.model_worker --model-names "gpt-3.5-turbo,text-davinci-003,text-embedding-ada-002,$MODELNAME" --model-path $OPENAIMODEL --controller http://0.0.0.0:21001 --worker http://0.0.0.0:$PORT --host 0.0.0.0 --port $PORT >>${MODELNAME}_worker.txt 2>&1 &
+	totalModels=$((totalModels + 1))
 
-    MODELS_ARRAY+=("$OPENAIMODEL")
-    sleep 1
+	MODELS_ARRAY+=("$OPENAIMODEL")
+	sleep 1
 fi
-
-
 
 echo "$totalModels detected. Waiting for downloading..."
 modelsLoaded=()
 allModelsLoaded=False
-while [ $allModelsLoaded = False ] ## This method does not include openai model
-do
-    for MODEL in "${MODELS_ARRAY[@]}"
-    do
-        echo "Checking $MODEL model worker..."
-        MODELNAME="$(cut -d'/' -f2 <<< $MODEL)"
-        if cat ${MODELNAME}_worker.txt | grep Uvicorn ; then
-            echo ""
-            echo "$MODEL model worker detected."
-            #loadedModels=$((loadedModels + 1))
-            modelsLoaded+=("$MODEL")
-        fi
-        echo $(tail -2 ${MODELNAME}_worker.txt | head -1)
-        echo ""
-        sleep 2
+while [ $allModelsLoaded = False ]; do ## This method does not include openai model
+	for MODEL in "${MODELS_ARRAY[@]}"; do
+		echo "Checking $MODEL model worker..."
+		MODELNAME="$(cut -d'/' -f2 <<<$MODEL)"
+		if cat ${MODELNAME}_worker.txt | grep Uvicorn; then
+			echo ""
+			echo "$MODEL model worker detected."
+			#loadedModels=$((loadedModels + 1))
+			modelsLoaded+=("$MODEL")
+		fi
+		echo $(tail -2 ${MODELNAME}_worker.txt | head -1)
+		echo ""
+		sleep 2
 
-        allModelsLoaded=True
-        for item in "${MODELS_ARRAY[@]}"; do
-            #echo MODELS LOADED
-            #echo $modelsLoaded
-            if [[ ! " ${modelsLoaded[@]} " =~ " $item " ]]; then
-                allModelsLoaded=False
-            fi
-        done
-    done
+		allModelsLoaded=True
+		for item in "${MODELS_ARRAY[@]}"; do
+			#echo MODELS LOADED
+			#echo $modelsLoaded
+			if [[ ! " ${modelsLoaded[@]} " =~ " $item " ]]; then
+				allModelsLoaded=False
+			fi
+		done
+	done
 done
-
 
 # The gradio server needs to be started after the model_worker has registered with
 # the controller; the gradio server asks the controller which models it knows about;
@@ -128,7 +134,10 @@ done
 
 echo "Running Gradio web app server for chat (port 7860 by default) ..."
 #tmux new-session -d -s gradio 'python3 -m fastchat.serve.gradio_web_server'
-python3 -m fastchat.serve.gradio_web_server >> gradio_web_server.txt 2>&1 &
+python3 -m fastchat.serve.gradio_web_server >>gradio_web_server.txt 2>&1 &
 
 echo "All services started; see log output in $LOGDIR"
-bash
+# this is simply run as an entrypoint script; for this reason, we add sleep infinity -
+# otherwise, it would just terminate after the services are brought up and then the
+# container stops running...
+sleep infinity
