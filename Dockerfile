@@ -13,10 +13,10 @@ RUN apt-get update && apt-get install -y \
     git \
     htop \
     nano \
+    curl \
     tmux
 
 RUN ln -s /usr/bin/python3 /usr/bin/python
-
 
 RUN useradd -ms /bin/bash sdsc
 USER sdsc
@@ -44,7 +44,9 @@ COPY ./app /home/sdsc/app
 
 USER root
 RUN chmod 777 /home/sdsc/app/entrypoint.sh
+RUN chown -R sdsc:sdsc /home/sdsc
 USER sdsc
+ENV HOME=/home/sdsc
 
 # start jupyter lab
 CMD ["bash","/home/sdsc/app/entrypoint.sh"]

@@ -66,6 +66,7 @@ from fastchat.protocol.api_protocol import (
 )
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 conv_template_map = {}
 
@@ -86,7 +87,8 @@ try:
 except KeyError:
     logger.info("No root path defined - using /")
 
-app = fastapi.FastAPI(root_path=root_path)
+#app = fastapi.FastAPI(root_path=root_path)
+app = fastapi.FastAPI()
 headers = {"User-Agent": "FastChat API Server"}
 get_bearer_token = HTTPBearer(auto_error=False)
 
@@ -340,7 +342,7 @@ async def get_conv(model_name: str):
         return conv_template
 
 
-@app.get("/staging-sean/sdschat/v1/models", dependencies=[Depends(check_api_key)])
+@app.get(root_path + "/v1/models", dependencies=[Depends(check_api_key)])
 async def show_available_models():
     controller_address = app_settings.controller_address
     async with httpx.AsyncClient() as client:
@@ -355,7 +357,7 @@ async def show_available_models():
     return ModelList(data=model_cards)
 
 
-@app.post("/staging-sean/sdschat/v1/chat/completions", dependencies=[Depends(check_api_key)])
+@app.post(root_path + "/v1/chat/completions", dependencies=[Depends(check_api_key)])
 async def create_chat_completion(request: ChatCompletionRequest):
     """Creates a completion for the chat message"""
     error_check_ret = await check_model(request)
@@ -875,6 +877,8 @@ if __name__ == "__main__":
     app_settings.controller_address = args.controller_address
     app_settings.api_keys = args.api_keys
 
+    logger.info(f"Running OpenAI API server with root path: {root_path}")
     logger.info(f"args: {args}")
 
     uvicorn.run(app, host=args.host, port=args.port, log_level="info")
+
